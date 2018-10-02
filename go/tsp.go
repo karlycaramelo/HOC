@@ -9,6 +9,10 @@ import (
     "math"
     "math/rand"
 
+
+    "log"
+    "os"
+
     _ "github.com/mattn/go-sqlite3"
 )
 
@@ -314,13 +318,20 @@ func temperaturaInicial(random *rand.Rand, cities []city, te int64, pmayus float
     return busquedaBinaria(random, cities, te1, te2, pmayus, normalizador, maximaDistancia)
 }
 
-func calculaLote(random *rand.Rand, te int64, cities []city, normalizador float64, maximaDistancia float64)(float64, []city){
+func calculaLote(random *rand.Rand, te int64, cities []city, normalizador float64, maximaDistancia float64, bestCities []city)(float64, []city, bool, []city){
     var c = 0
     var r = 0.0
     var ele = 400
     var ese = cities
     var efese = funcionCosto(ese, normalizador, maximaDistancia)
+    var efebestcities = funcionCosto(bestCities, normalizador, maximaDistancia)
+    var continua = true
+    var stopLimit = (math.Pow(float64(ele),2.0))
+    //var stopLimit = 1000.0 
+    var stopCount = 0.0
+    var returnbestCities []city
     for c < ele{
+        stopCount = stopCount + 1.0
         var eseprima = vecino(random, ese)
         var efeeseprima = funcionCosto(eseprima, normalizador, maximaDistancia)
         if (efeeseprima < efese + float64(te)){
@@ -328,15 +339,33 @@ func calculaLote(random *rand.Rand, te int64, cities []city, normalizador float6
             efese = efeeseprima
             c = c +1
             r = r + efeeseprima
-            fmt.Print("c= ")
-            fmt.Print(c)   
-            fmt.Print("\n")
-            fmt.Print("f(s)= ")
-            fmt.Print(FloatToString(efeeseprima))   
-            fmt.Print("\n")
+            //fmt.Print("c= ")
+            //fmt.Print(c)   
+            //fmt.Print("\n")
+            //fmt.Print("f(s)= ")
+            //fmt.Print(FloatToString(efeeseprima))   
+            //fmt.Print("\n")
+            if (efese < efebestcities){
+                efebestcities = efese
+                bestCities = make([]city, len(ese))
+                copy(bestCities, ese)
+                fmt.Print("MejorSolucionFactibilidad: ")
+                fmt.Print(FloatToString(efebestcities/maximaDistancia))   
+                fmt.Print("\n")
+            }
+            stopCount = 0.0
         }
+        if (stopCount >= stopLimit){
+            continua = false
+            break
+        }
+        returnbestCities = bestCities
     }
-    return (float64(r)/float64(ele)), ese
+    var salidabestcities = funcionCosto(returnbestCities, normalizador, maximaDistancia)
+    fmt.Print("MejorSolucionFactibilidadSalida: ")
+    fmt.Print(FloatToString(salidabestcities/maximaDistancia))   
+    fmt.Print("\n")
+    return (float64(r)/float64(ele)), ese, continua, returnbestCities
 } 
 
 func aceptacionPorUmbrales(random *rand.Rand, te int64, cities []city, normalizador float64, maximaDistancia float64){
@@ -344,6 +373,12 @@ func aceptacionPorUmbrales(random *rand.Rand, te int64, cities []city, normaliza
     var epsilon int64
     epsilon = 1000
     var p = 0.0
+    var bestCities []city
+    var continuar bool
+    bestCities = make([]city, len(cities))
+    copy(bestCities, cities)
+    fmt.Print(bestCities)
+    fmt.Print(cities)
     for(te > epsilon){
         fmt.Print("T value: ")
         fmt.Print(te)
@@ -351,17 +386,85 @@ func aceptacionPorUmbrales(random *rand.Rand, te int64, cities []city, normaliza
         var q = math.MaxFloat64
         for(p <= q){
             q = p
-            p, cities = calculaLote(random, te, cities, normalizador, maximaDistancia)
+            var entrabestcities = funcionCosto(bestCities, normalizador, maximaDistancia)
+            fmt.Print("MejorSolucionFactibilidadentra: ")
+            fmt.Print(FloatToString(entrabestcities/maximaDistancia))   
+            fmt.Print("\n")
+            p, cities, continuar, bestCities = calculaLote(random, te, cities, normalizador, maximaDistancia, bestCities)
+            var saliobestcities = funcionCosto(bestCities, normalizador, maximaDistancia)
+            fmt.Print("MejorSolucionFactibilidadSalio: ")
+            fmt.Print(FloatToString(saliobestcities/maximaDistancia))   
+            fmt.Print("\n")
+            /*
+            var efebestcities = funcionCosto(bestCities, normalizador, maximaDistancia)
+            fmt.Print("MejorSolucionCiudades: ")
+            fmt.Print(bestCities)   
+            fmt.Print("\n")
+            fmt.Print("MejorSolucionFactibilidad: ")
+            fmt.Print(FloatToString(efebestcities/maximaDistancia))   
+            fmt.Print("\n")
+            */
+            if (!continuar){
+                break
+            }
         }
         fmt.Print("Promedio aceptados: ")
         fmt.Print(FloatToString(p))   
         fmt.Print("\n")
         //fmt.Print("Lista ciudades: ")    
         //fmt.Print(ciudadesRes)
-        te = int64(float64(te)*phi)
-        
-    
-  }
+        te = int64(float64(te)*phi) 
+        if (!continuar){
+            var efebestcities = funcionCosto(bestCities, normalizador, maximaDistancia)
+            fmt.Print("MejorSolucionCiudades: ")
+            fmt.Print(bestCities)   
+            fmt.Print("\n")
+            fmt.Print("MejorSolucionFactibilidad: ")
+            fmt.Print(FloatToString(efebestcities/maximaDistancia))   
+            fmt.Print("\n")
+
+            var strMejorSolCiudades = citiesACadenaIndices(bestCities)+"\n"
+            appendFile("fileResults.txt", strMejorSolCiudades)
+
+            var strMejorSolFacti = "MejorSolucionFactibilidad: "+FloatToString(efebestcities/maximaDistancia)+"\n"
+            appendFile("fileResults.txt", strMejorSolFacti)
+
+
+
+            break
+
+        }
+    }
+}
+
+func appendFile(file_name string, string_to_write string) {  
+    os.OpenFile(file_name, os.O_RDONLY|os.O_CREATE, 0666)   
+    file, err := os.OpenFile(file_name, os.O_WRONLY|os.O_APPEND, 0644)
+    if err != nil {
+        log.Fatalf("failed opening file: %s", err)
+    }
+    defer file.Close()
+ 
+    len, err := file.WriteString(string_to_write)
+    if err != nil {
+        log.Fatalf("failed writing to file: %s", err)
+    }
+    fmt.Printf("\nLength: %d bytes", len)
+    fmt.Printf("\nFile Name: %s", file.Name())
+}
+
+func citiesACadenaIndices(cities []city) string {
+    var sizeCities = len(cities)
+    var indexCities = 0
+    var cadenaCities = ""
+    for (indexCities < sizeCities){
+        if (indexCities != 0){
+            cadenaCities += ","
+        } 
+        cadenaCities += strconv.Itoa(cities[indexCities].Id)
+        indexCities = indexCities +1
+    }
+    return cadenaCities
 }
 
 func  main() {  
@@ -420,8 +523,6 @@ func  main() {
     fmt.Print("\n")
 
 
-    //Incializamos la funcion random
-    random := rand.New(rand.NewSource(1))
 
     //Inicializamos la t
     var teinicial int64
@@ -429,12 +530,31 @@ func  main() {
     teinicial = 8 
     var pmayus = 0.9
     fmt.Print("Vamos a calcular temp inicial:\n ")
+    random := rand.New(rand.NewSource(42))
     var te = temperaturaInicial(random, citiesSolIni, teinicial, pmayus, normalizador, maximaDistancia)
     fmt.Print("T value inicial: ")
     fmt.Print(te)
     fmt.Print("\n")
 
-    //Corremos la funcion de aceptaron por umbrales
-    aceptacionPorUmbrales(random, te, citiesSolIni, normalizador, maximaDistancia)
+    var valorInicial = "T value inicial: "
+    valorInicial += strconv.Itoa(int(te))
+    valorInicial += "\n"
+    appendFile("fileResults.txt", valorInicial)
+
+    var intInicio int64
+    intInicio = 1
+    var intFinal int64
+    intFinal = 10
+    for (intInicio <= intFinal){
+        //Incializamos la funcion random
+        random := rand.New(rand.NewSource(intInicio))
+        var semillaRandom = "Semilla para random: "
+        semillaRandom += strconv.Itoa(int(intInicio))
+        semillaRandom += "\n"
+        appendFile("fileResults.txt", semillaRandom)
+        //Corremos la funcion de aceptaron por umbrales
+        aceptacionPorUmbrales(random, te, citiesSolIni, normalizador, maximaDistancia)
+        intInicio = intInicio +1
+    }
 
 }
