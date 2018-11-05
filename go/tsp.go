@@ -8,19 +8,15 @@ import (
     "sort"
     "math"
     "math/rand"
-
-
     "log"
     "os"
-
     _ "github.com/mattn/go-sqlite3"
 )
 
+// to convert a float number to a string
 func FloatToString(input_num float64) string {
-    // to convert a float number to a string
     return strconv.FormatFloat(input_num, 'f', 6, 64)
 }
-
 
 //Estructura para las ciudades
 type city struct {  
@@ -38,23 +34,18 @@ type temp_parametes struct {
     pmayus  float64
     epsilomTe float64
     epsilomPe float64
+    ene int64
 }
 //Estructura param para calular tsp
 type tsp_parameters struct {
     maximaDistancia float64
     normalizador float64
     citiesDistance map[int]map[int]float64
-    ene int64
-    te float64
-    ele float64
-    phi float64
-    epsilon float64
+    tamLote float64
+    intentosMaximos float64
+    factorEnfriamiento float64
+    apuEpsilon float64
 }
-
-//func float64 ciudadesDistancias(cities []float64){
-    
-//}
-
 
 //Funcion que da la lista de ciudad obtenida de la base de datos
 func listaCiudades(entradaSize int, ciudadesIds string) []city{
@@ -92,6 +83,14 @@ func listaCiudades(entradaSize int, ciudadesIds string) []city{
     }
     defer database.Close()
     return cities
+}
+
+func printListaCiudades(cities []city){
+    var ciudadesStr = ""
+    for _, cid := range cities{
+        ciudadesStr += strconv.Itoa(cid.Id)+","
+    }
+    fmt.Println(ciudadesStr)
 }
 
 //Dada una lista de ciudades regresa una lista de ciudades
@@ -230,24 +229,21 @@ func pesoAumentado(ciudad1 city, ciudad2 city, maximaDistancia float64) float64 
 //el normalizador 
 func funcionCosto(cities []city, tspParams tsp_parameters) float64 {
     var normalizador = tspParams.normalizador
+    //var maximaDistancia = tspParams.maximaDistancia
     var citiesDistance = tspParams.citiesDistance
     var index = 1
     var eval = 0.0
     for (index < len(cities)){
-        //var pesAuOr float64
         var pesAu float64
-        //pesAu = pesoAumentado(cities[index-1], cities[index], maximaDistancia)
         pesAu = citiesDistance[cities[index-1].Id][cities[index].Id]
         //######Prints incluidos pare verificar paso a paso como se hace el calculo de la funcion costo
         /*
         fmt.Print("Distancia de ")
         fmt.Print(cities[index-1])
-        fmt.Print(" a: ")
+        fmt.Print(" a ")
         fmt.Print(cities[index])
-        fmt.Print(": ")
+        fmt.Print(" : ")
         fmt.Print(FloatToString(pesAu))
-        fmt.Print("::")
-        fmt.Print(FloatToString(pesAuOr))
         fmt.Print("\n")
         */
         //######Prints incluidos pare verificar paso a paso como se hace el calculo de la funcion costo
@@ -264,6 +260,13 @@ func funcionCosto(cities []city, tspParams tsp_parameters) float64 {
 //Funcion que calcula un vecion d eforma aletorioa 
 //Simplemente hacea el swap de 2 ciudade de manera aleatoria
 func vecino(random *rand.Rand, cities []city) []city{
+    var citiesCopy []city
+    citiesCopy = make([]city, len(cities))
+    for i := 0;i < len(cities); i++ {
+        citiesCopy[i] = cities[i]
+    }
+
+
     var numChanges = random.Intn(9) + 1 
     numChanges = 1
     var iter = 1
@@ -271,27 +274,34 @@ func vecino(random *rand.Rand, cities []city) []city{
     //DEspues de probar un par de veces funciona mejor hacer el sawp de una sola ciudad
     //Por eso numchange se queda en 1 para que solo haga un swap
     for (iter <= numChanges){
-        var index1 = random.Intn(len(cities))
-        var index2 = random.Intn(len(cities))
+        var index1 = random.Intn(len(citiesCopy))
+        var index2 = random.Intn(len(citiesCopy))
         var swapCitie city
-        swapCitie = cities[index1]
-        cities[index1] = cities[index2]
-        cities[index2] = swapCitie
-        //fmt.Println(cities)
+        swapCitie = citiesCopy[index1]
+        citiesCopy[index1] = citiesCopy[index2]
+        citiesCopy[index2] = swapCitie
+        //fmt.Println(citiesCopy)
         iter = iter +1
     }
-    return cities
+    return citiesCopy
 }
 
-//Hace tspParams.ene intentos para ver si cuantos acepta con la te actual 
-func porcentajeAceptados(random *rand.Rand, cities []city, te float64, tspParams tsp_parameters) float64{
+//Hace tempParams.ene intentos para ver si cuantos acepta con la te actual 
+func porcentajeAceptados(random *rand.Rand, cities []city, te float64, tempParams temp_parametes, tspParams tsp_parameters) float64{
     var c = 0
     var i = 1 
-    var ene = tspParams.ene
-    var ese = cities
-    var efeese = funcionCosto(cities, tspParams)
+    var ene = tempParams.ene
+    var ese []city
+    ese = make([]city, len(cities))
+    for i := 0;i < len(cities); i++ {
+        ese[i] = cities[i]
+    }
+    var efeese = funcionCosto(ese, tspParams)
     for (i < int(ene)){
         var eseprima = vecino(random, ese)
+        for i := 0;i < len(cities); i++ {
+            ese[i] = eseprima[i]
+        }
         var efeeseprima = funcionCosto(eseprima, tspParams)
         if (efeeseprima < efeese + float64(te)){
             c = c +1
@@ -316,7 +326,7 @@ func busquedaBinaria(random *rand.Rand, cities []city, te1 float64, te2 float64,
     if (float64(te2-te1) < epsilomTe){
         return float64(teeme)
     }
-    var pminus=porcentajeAceptados(random, cities, float64(teeme), tspParams)
+    var pminus=porcentajeAceptados(random, cities, float64(teeme), tempParams, tspParams)
     if (math.Abs(pmayus-pminus) < epsilomPe){
         return float64(teeme)
     }
@@ -330,169 +340,165 @@ func busquedaBinaria(random *rand.Rand, cities []city, te1 float64, te2 float64,
 
 //Funcion para buscar la temparatura inicial correcta
 func temperaturaInicial(random *rand.Rand, cities []city, tempParams temp_parametes, tspParams tsp_parameters) float64 {
-    var te = tempParams.teInicial
+    var temp float64
+    temp = tempParams.teInicial
     var pmayus = tempParams.pmayus
     var epsilomPe = tempParams.epsilomPe
-    var pminus=porcentajeAceptados(random, cities, float64(te), tspParams)
-    if (math.Abs(pmayus-pminus) < epsilomPe){
-        return float64(te)
+    var pminus=porcentajeAceptados(random, cities, float64(temp), tempParams, tspParams)
+    if (math.Abs(pmayus-pminus) <= epsilomPe){
+        return float64(temp)
     }
     var te1 float64
     var te2 float64
     if (pminus < pmayus){
         for(pminus < pmayus){
-            te = te*2
-             pminus =porcentajeAceptados(random, cities, float64(te), tspParams)
+            temp = temp*2
+            pminus =porcentajeAceptados(random, cities, float64(temp), tempParams, tspParams)
         }
-        te1 = te/2
-        te2 = te 
+        te1 = temp/2
+        te2 = temp 
     }else{
          for(pminus > pmayus){
-            te = te/2
-             pminus =porcentajeAceptados(random, cities, float64(te), tspParams)
+            temp = temp/2
+            pminus =porcentajeAceptados(random, cities, float64(temp), tempParams, tspParams)
         }
-        te1 = te
-        te2 = te*2        
+        te1 = temp
+        te2 = temp*2        
     }
     return busquedaBinaria(random, cities, te1, te2, tempParams, tspParams)
 }
 
 
 //Funcion calculaLote definida como en el PDF pero se pasan todos lo parametros necesario y bestCities para i guardando la mejor solucion
-func calculaLote(random *rand.Rand, te float64, cities []city,  bestCities []city, tspParams tsp_parameters)(float64, []city, bool, []city){
-    var maximaDistancia = tspParams.maximaDistancia
+func calculaLote(random *rand.Rand, temperatura float64, cities []city,  bestCities []city, tspParams tsp_parameters)(float64, []city, bool, []city){
     var c = 0.0
     var r = 0.0
-    var ele = tspParams.ele
-    var ese = cities
-    var efese = funcionCosto(ese, tspParams)
-    var efebestcities = funcionCosto(bestCities, tspParams)
-    //Variable que nos dice cuadno el agoritmos va a continuar pordefualt es verdadero
     var continua = true
-    //El limite para saber cuabndo se detienes es ele^2
-    var stopLimit = (math.Pow(float64(ele),2.0))
-    //var stopLimit = 1000.0
-    //Se inicializa el conteo para deternse
+
+
+    var ese []city
+    ese = make([]city, len(cities))
+    for i := 0;i < len(cities); i++ {
+        ese[i] = cities[i]
+    }
+    var efese = funcionCosto(ese, tspParams)
+
+
+    var newbestCities []city
+    newbestCities = make([]city, len(bestCities))
+    for i := 0;i < len(bestCities); i++ {
+        newbestCities[i] = bestCities[i]
+    }
+    var efenewbestCities = funcionCosto(newbestCities, tspParams)
+
+    //Se inicializa el conteo para detenerse
     var stopCount = 0.0
-    var returnbestCities []city
-    for c < ele{
+    for c < tspParams.tamLote{
         stopCount = stopCount + 1.0
         var eseprima = vecino(random, ese)
+        //fmt.Print("ESE     :")
+        //printListaCiudades(ese)
+        //fmt.Print("ESEPRIMA:")
+        //printListaCiudades(eseprima)
         var efeeseprima = funcionCosto(eseprima, tspParams)
-        if (efeeseprima < efese + float64(te)){
-            ese = eseprima
+        if (efeeseprima < efese + float64(temperatura)){
+            stopCount = 0.0
+            for i := 0;i < len(eseprima); i++ {
+                ese[i] = eseprima[i]
+            }
             efese = efeeseprima
             c = c +1
-            r = r + efeeseprima
-            //fmt.Print("c= ")
-            //fmt.Print(c)   
-            //fmt.Print("\n")
-            //fmt.Print("f(s)= ")
-            //fmt.Print(FloatToString(efeeseprima))   
-            //fmt.Print("\n")
-            //Si el resultado que se encuenta es mejor al bestCities actual
-            //actualizamos el valor
-            if (efese < efebestcities){
-                efebestcities = efese
-                bestCities = make([]city, len(ese))
-                copy(bestCities, ese)
-                fmt.Print("MejorSolucionFactibilidad: ")
-                fmt.Print(FloatToString(efebestcities/maximaDistancia))   
-                fmt.Print("\n")
+            r = r + efese
+            if (efese < efenewbestCities){
+                for i := 0;i < len(ese); i++ {
+                    newbestCities[i] = ese[i]
+                }
             }
-            stopCount = 0.0
         }
         //Si el conteo es mayor al limite se va a deetener y la variable continua se pone en falso
-        if (stopCount >= stopLimit){
+        if (stopCount >= tspParams.intentosMaximos){
             continua = false
+            fmt.Print("SE VA DETENER  \n")
             break
         }
-        returnbestCities = bestCities
     }
-    var salidabestcities = funcionCosto(returnbestCities, tspParams)
     fmt.Print("MejorSolucionFactibilidadSalida: ")
-    fmt.Print(FloatToString(salidabestcities/maximaDistancia))   
+    fmt.Print(FloatToString(efenewbestCities/tspParams.maximaDistancia))   
     fmt.Print("\n")
+
 
     //Regresamos el promedio de la soluciones encontradas, la solucion ese que se encontra como ultima
     //continua que nos dice si algoritmo va a continuar esta es false solo cuando se pasa el limite de intentos stopLomit
     //Y la mejor solucion encontrada hasta el momento (bestCities)
-    return (float64(r)/float64(ele)), ese, continua, returnbestCities
+    return (float64(r)/float64(tspParams.tamLote)), ese, continua, newbestCities
 } 
 
 
 //Funcion de aceptacion por umbrales acorde al PDF 
-func aceptacionPorUmbrales(random *rand.Rand, te float64, cities []city, tspParams tsp_parameters){
-    var maximaDistancia = tspParams.maximaDistancia
-    var phi = tspParams.phi
-    var epsilon float64
-    epsilon = tspParams.epsilon
-    var p = 0.0
+func aceptacionPorUmbrales(random *rand.Rand, temperatura float64, cities []city, tspParams tsp_parameters){
+
     //Variable que va guardando la mejor solucion 
     //Esta variable se pasa como parametro a cada vez que se llamanda a llmar funcionCosto y se actualiza con los resultados
     //De la funcion
     var bestCities []city
+    //bestCities se empieza con la lista de entrada
+    bestCities = make([]city, len(cities))
+    for i := 0;i < len(cities); i++ {
+        bestCities[i] = cities[i]
+    }
     //Esta varaibles nos dice cuando debemos detener el algoritmo (que es cuando se hacen N  (muy grande en relacion a L) intentos
     //De mejorar lel resultado y no se avanza
     var continuar bool
-    //bestCities se empieza con la lista de entrada
-    bestCities = make([]city, len(cities))
-    copy(bestCities, cities)
-    fmt.Print(bestCities)
-    fmt.Print(cities)
-    for(te > epsilon){
-        fmt.Print("T value: ")
-        fmt.Print(te)
-        fmt.Print("\n")
-        var q = math.MaxFloat64
-        for(p <= q){
+    continuar = true
+
+    var p = 0.0
+    for(temperatura > tspParams.apuEpsilon){
+        var q = math.MaxFloat64	
+        //Orignalmente era p <= q pero asi nunca termina etnones quite el =
+        for(p < q){
             q = p
             //Mandamos a llamar calculaLote con todo los parametros necesarios, usnado bestCities para guardar el mejor resultado
             //la variabl continuar nos dice si debemos de continuar con el algoritmo (si ya no se pudo avanzar)
-            p, cities, continuar, bestCities = calculaLote(random, te, cities, bestCities, tspParams)
-            /*
-            var efebestcities = funcionCosto(bestCities, normalizador, maximaDistancia, citiesDistance)
-            fmt.Print("MejorSolucionCiudades: ")
-            fmt.Print(bestCities)   
-            fmt.Print("\n")
-            fmt.Print("MejorSolucionFactibilidad: ")
-            fmt.Print(FloatToString(efebestcities/maximaDistancia))   
-            fmt.Print("\n")
-            */
-            if (!continuar){
+            var newp float64
+            var newcities []city
+            var newcontinuar bool
+            var newbestCities []city
+            newp, newcities, newcontinuar, newbestCities = calculaLote(random, temperatura, cities, bestCities, tspParams)      
+            if (!newcontinuar){
+                continuar = false
                 break
+            }
+            p = newp
+            cities = newcities
+            for i := 0;i < len(newbestCities); i++ {
+                bestCities[i] = newbestCities[i]
             }
         }
         fmt.Print("Promedio aceptados: ")
         fmt.Print(FloatToString(p))   
         fmt.Print("\n")
-        //fmt.Print("Lista ciudades: ")    
-        //fmt.Print(ciudadesRes)
-        te = float64(float64(te)*phi) 
+        temperatura = float64(float64(temperatura)*tspParams.factorEnfriamiento) 
 
         //Cuando ya no se va a continur imprimos el mejero resultado y su funcion de cost en la consola y lo 
         //Guardamos en un archivo
         if (!continuar){
-            var efebestcities = funcionCosto(bestCities, tspParams)
-            fmt.Print("MejorSolucionCiudades: ")
-            fmt.Print(bestCities)   
-            fmt.Print("\n")
-            fmt.Print("MejorSolucionFactibilidad: ")
-            fmt.Print(FloatToString(efebestcities/maximaDistancia))   
-            fmt.Print("\n")
-
-            var strMejorSolCiudades = citiesACadenaIndices(bestCities)+"\n"
-            appendFile("fileResultsMEM.txt", strMejorSolCiudades)
-
-            var strMejorSolFacti = "MejorSolucionFactibilidad: "+FloatToString(efebestcities/maximaDistancia)+"\n"
-            appendFile("fileResultsMEM.txt", strMejorSolFacti)
-
-
-
             break
-
         }
     }
+
+    var efebestcities = funcionCosto(bestCities, tspParams)
+    fmt.Print("MejorSolucionCiudades: ")
+    fmt.Print(bestCities)   
+    fmt.Print("\n")
+    fmt.Print("MejorSolucionFactibilidad: ")
+    fmt.Print(FloatToString(efebestcities/tspParams.maximaDistancia))   
+    fmt.Print("\n")
+
+    var strMejorSolCiudades = citiesACadenaIndices(bestCities)+"\n"
+    appendFile("fileResultsMEM2.txt", strMejorSolCiudades)
+
+    var strMejorSolFacti = "MejorSolucionFactibilidad: "+FloatToString(efebestcities/tspParams.maximaDistancia)+"\n"
+    appendFile("fileResultsMEM2.txt", strMejorSolFacti)
 }
 
 func appendFile(file_name string, string_to_write string) {  
@@ -523,6 +529,34 @@ func citiesACadenaIndices(cities []city) string {
         indexCities = indexCities +1
     }
     return cadenaCities
+}
+
+func printMapCities(citiesDistance map[int]map[int]float64){
+    keys := make([]int, len(citiesDistance))
+    i := 0
+    for k := range citiesDistance {
+        keys[i] = k
+        i++
+    }   
+    sort.Ints(keys)
+    for _, key := range keys{
+        keysMap := make([]int, len(citiesDistance))
+        i := 0
+        for kmap := range citiesDistance[key] {
+            keysMap[i] = kmap
+            i++
+        }   
+        sort.Ints(keysMap)
+        for _, keymap := range keysMap{
+            fmt.Print("(")
+            fmt.Print(key)
+            fmt.Print(",")
+            fmt.Print(keymap)
+            fmt.Print("): ")
+            fmt.Print(FloatToString(citiesDistance[key][keymap]))
+            fmt.Print("\n")                     
+        }
+    }
 }
 
 func  main() {  
@@ -568,23 +602,26 @@ func  main() {
         indexCI = indexCI +1
     }
 
-
-
+    //printMapCities(citiesDistance)
+/*
     //###########CODIGO PARA PROBAR LA LISTA QUE CANEK DIJO QUE TGENIAMOS MAL EL VALOR y se modifico funcionCosto para imprimr cada paso y tratar de ver que esta mal
-    /*
+    
     //Tama;o de la entrada para la funcion costo 10
     var entradaSizeFunCosto = 40
     var pruebaCanek = "330,3,817,653,816,493,163,1,815,490,329,165,978,2,492,654,164,979,981,167,326,814,818,28,1037,655,666,658,169,328,495,166,327,489,494,980,74,819,1073,491"
+    //var pruebaCanek = "1,163,489,491,979,493,815,2,329,490,653,654,816,981,165,492,817,978,3,164,327,980,74,166,655,1037,1073,330,658,666,818,819,28,169,328,495,167,326,494,814"
+    //var pruebaCanek = "1,2,3,28,74,163,164,165,166,167,169,326,327,328,329,330,489,490,491,492,493,494,495,653,654,655,658,666,814,815,816,817,818,819,978,979,980,981,1037,1073" 
     var citiesPruebaCanek = listaCiudades(entradaSizeFunCosto, pruebaCanek)
     var funCostoCanek float64
-    funCostoCanek = funcionCosto(citiesPruebaCanek, normalizador, maximaDistancia, citiesDistance)
+    funCostoCanek = funcionCosto(citiesPruebaCanek, tspParams)
     //Imprimos el resultado de la funcion costo
     fmt.Print("Funcion Costo Canek: ")
     fmt.Print(FloatToString(funCostoCanek))
     fmt.Print("\n")
-    */
-    //###########CODIGO PARA PROBAR LA LISTA QUE CANEK DIJO QUE TGENIAMOS MAL EL VALOR y se modifico funcionCosto para imprimr cada paso y tratar de ver que esta mal
     
+    //###########CODIGO PARA PROBAR LA LISTA QUE CANEK DIJO QUE TGENIAMOS MAL EL VALOR y se modifico funcionCosto para imprimr cada paso y tratar de ver que esta mal
+*/    
+
 /*
 //Estructura param para calular temp inicial
 type temp_parametes struct {
@@ -592,49 +629,68 @@ type temp_parametes struct {
     pmayus  float64
     epsilomTe float64
     epsilomPe float64
+    ene int64
 }
 //Estructura param para calular tsp
 type tsp_parameters struct {
     maximaDistancia float64
     normalizador float64
     citiesDistance map[int]map[int]float64
-    ene int64
-    te float64
-    ele float64
-    phi float64
-    epsilon float64
+    tamLote float64
+    intentosMaximos float64
+    factorEnfriamiento float64
+    apuEpsilon float64
 }
 */
 
-    tempParams := temp_parametes{8, 0.9, 0.02, 0.04}    
-    tspParams := tsp_parameters{maximaDistancia, normalizador, citiesDistance, 1000, 0.0, 400.0, 0.9, 1000}
-    
+    tempParams := temp_parametes{8, 0.90, 0.02, 0.04, 1000}    
+    tspParams := tsp_parameters{maximaDistancia, normalizador, citiesDistance, 2000.0, 4000.0, 0.9, 0.0001}
+
+    var funCosto float64
+    funCosto = funcionCosto(cities, tspParams)
+    //Imprimos el resultado de la funcion costo
+    fmt.Print("Funcion Costo: ")
+    fmt.Print(FloatToString(funCosto))
+    fmt.Print("\n")
+
+/*
+    random := rand.New(rand.NewSource(int64(5)))
+    var citiesPrima = vecino(random, cities)
+    print(cities)
+    fmt.Print (cities)
+    fmt.Print("\n")
+    print(citiesPrima)
+    fmt.Print (citiesPrima)
+    fmt.Print("\n")
+    cities = citiesPrima
+    print(cities)
+    fmt.Print (cities)
+    fmt.Print("\n")
+*/
     //Definimos las variables para hacer un loob para correr varias veces el algoritmo
     //tomando diferentes semillas para el random
     var intInicio float64
-    intInicio = 1
+    intInicio = 0
     var intFinal float64
-    intFinal = 9999
+    intFinal = 10
     for (intInicio <= intFinal){
        //Incializamos la funcion random
-        random := rand.New(rand.NewSource(int64(intInicio)))
+        randomSeed := rand.New(rand.NewSource(int64(intInicio)))
         var semillaRandom = "Semilla para random: "
         semillaRandom += strconv.Itoa(int(intInicio))
         semillaRandom += "\n"
-        appendFile("fileResultsMEM.txt", semillaRandom)
+        appendFile("fileResultsMEM2.txt", semillaRandom)
 
         //Vamos a calcular temp inicial:
-        var te = temperaturaInicial(random, cities, tempParams, tspParams)
+        var tempInicial = temperaturaInicial(randomSeed, cities, tempParams, tspParams)
         //Actualizamos la temperatura inicial para le valor random
-        tspParams.te = te
         var valorInicial = "T value inicial: "
-        valorInicial += strconv.Itoa(int(tspParams.te))
+        valorInicial += strconv.Itoa(int(tempInicial))
         valorInicial += "\n"
-        appendFile("fileResultsMEM.txt", valorInicial)
+        appendFile("fileResultsMEM2.txt", valorInicial)
 
- 
         //Corremos la funcion de aceptaron por umbrales
-        aceptacionPorUmbrales(random, te, cities, tspParams)
+        aceptacionPorUmbrales(randomSeed, tempInicial, cities, tspParams)
         intInicio = intInicio +1
     }
     
