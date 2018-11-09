@@ -194,7 +194,15 @@ func distanciaNatural(ciudad1 city, ciudad2 city) float64 {
 func pesoAumentado(ciudad1 city, ciudad2 city, maximaDistancia float64) float64 {
     //Conexion a la base de datos 
     database, _ := sql.Open("sqlite3", "./tsp.db")
-    var sqlQueryDistance1 = "SELECT distance FROM connections WHERE id_city_1="+ strconv.Itoa(ciudad1.Id) +" AND id_city_2="+ strconv.Itoa(ciudad2.Id)
+
+    var sqlQueryDistance1 string
+    if (ciudad1.Id > ciudad2.Id){
+        sqlQueryDistance1 = "SELECT distance FROM connections WHERE id_city_1="+ strconv.Itoa(ciudad2.Id) +" AND id_city_2="+ strconv.Itoa(ciudad1.Id)
+    }else{
+        sqlQueryDistance1 = "SELECT distance FROM connections WHERE id_city_1="+ strconv.Itoa(ciudad1.Id) +" AND id_city_2="+ strconv.Itoa(ciudad2.Id)
+    }
+
+    //sqlQueryDistance1 = "SELECT distance FROM connections WHERE id_city_1="+ strconv.Itoa(ciudad1.Id) +" AND id_city_2="+ strconv.Itoa(ciudad2.Id)
     //fmt.Println(sqlQueryDistance1) 
     rows, _ := database.Query(sqlQueryDistance1)
 
@@ -407,8 +415,8 @@ func calculaLote(random *rand.Rand, temperatura float64, cities []city,  bestCit
         }
     }
     fmt.Print("MejorSolucionFactibilidadSalida: ")
-    fmt.Print(FloatToString(efenewbestCities/tspParams.maximaDistancia))
-    //fmt.Print(FloatToString(efenewbestCities)) 
+    //fmt.Print(FloatToString(efenewbestCities/tspParams.maximaDistancia))
+    fmt.Print(FloatToString(efenewbestCities)) 
     fmt.Print("\n")
 
 
@@ -476,16 +484,16 @@ func aceptacionPorUmbrales(random *rand.Rand, temperatura float64, cities []city
     fmt.Print(bestCities)   
     fmt.Print("\n")
     fmt.Print("MejorSolucionFactibilidad: ")
-    fmt.Print(FloatToString(efebestcities/tspParams.maximaDistancia))   
-    //fmt.Print(FloatToString(efebestcities))   
+    //fmt.Print(FloatToString(efebestcities/tspParams.maximaDistancia))   
+    fmt.Print(FloatToString(efebestcities))   
     fmt.Print("\n")
 
     var strMejorSolCiudades = citiesACadenaIndices(bestCities)+"\n"
-    appendFile("fileResultsMEM2.txt", strMejorSolCiudades)
+    appendFile("fileResults.txt", strMejorSolCiudades)
 
-    var strMejorSolFacti = "MejorSolucionFactibilidad: "+FloatToString(efebestcities/tspParams.maximaDistancia)+"\n"
-    //var strMejorSolFacti = "MejorSolucionFactibilidad: "+FloatToString(efebestcities)+"\n"
-    appendFile("fileResultsMEM2.txt", strMejorSolFacti)
+    //var strMejorSolFacti = "MejorSolucionFactibilidad: "+FloatToString(efebestcities/tspParams.maximaDistancia)+"\n"
+    var strMejorSolFacti = "MejorSolucionFactibilidad: "+FloatToString(efebestcities)+"\n"
+    appendFile("fileResults.txt", strMejorSolFacti)
 }
 
 func appendFile(file_name string, string_to_write string) {  
@@ -574,8 +582,10 @@ func  main() {
 
     //Instancia del TSP
     //Tama;o de la entrada
-    var entradaSize = 40
-    var ciudadesIds = "1,2,3,28,74,163,164,165,166,167,169,326,327,328,329,330,489,490,491,492,493,494,495,653,654,655,658,666,814,815,816,817,818,819,978,979,980,981,1037,1073" 
+    //var entradaSize = 40
+    //var ciudadesIds = "1,2,3,28,74,163,164,165,166,167,169,326,327,328,329,330,489,490,491,492,493,494,495,653,654,655,658,666,814,815,816,817,818,819,978,979,980,981,1037,1073" 
+    var entradaSize = 150
+    var ciudadesIds = "1,2,3,4,5,6,7,8,9,11,12,14,16,17,19,20,22,23,25,26,27,28,74,75,151,163,164,165,166,167,168,169,171,172,173,174,176,179,181,182,183,184,185,186,187,297,326,327,328,329,330,331,332,333,334,336,339,340,343,344,345,346,347,349,350,351,352,444,483,489,490,491,492,493,494,495,496,499,500,501,502,504,505,507,508,509,510,511,512,520,652,653,654,655,656,657,658,660,661,662,663,665,666,667,668,670,671,673,674,675,676,678,814,815,816,817,818,819,820,821,822,823,825,826,828,829,832,837,839,840,978,979,980,981,982,984,985,986,988,990,991,995,999,1001,1003,1004,1037,1038,1073,1075" 
     var cities = listaCiudades(entradaSize, ciudadesIds)
 
     //Inicializamos una variable para la guardar la distancia maxima
@@ -697,7 +707,7 @@ type tsp_parameters struct {
         var semillaRandom = "Semilla para random: "
         semillaRandom += strconv.Itoa(int(intInicio))
         semillaRandom += "\n"
-        appendFile("fileResultsMEM2.txt", semillaRandom)
+        appendFile("fileResults.txt", semillaRandom)
 
         var citiesRandom []city
         citiesRandom = aleatorizaSolucion(randomSeed, cities)
@@ -708,7 +718,7 @@ type tsp_parameters struct {
         var valorInicial = "T value inicial: "
         valorInicial += strconv.Itoa(int(tempInicial))
         valorInicial += "\n"
-        appendFile("fileResultsMEM2.txt", valorInicial)
+        appendFile("fileResults.txt", valorInicial)
 
         //Corremos la funcion de aceptaron por umbrales
         aceptacionPorUmbrales(randomSeed, tempInicial, citiesRandom, tspParams)
