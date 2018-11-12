@@ -367,7 +367,7 @@ func calculaLote(random *rand.Rand, temperatura float64, cities []city,  bestCit
         var efeeseprima = funcionCosto(eseprima, tspParams)
         if (efeeseprima < efese + float64(temperatura)){
             //Solucion aceptada
-            fmt.Print(FloatToString(efeeseprima)+"\n")
+            //fmt.Print(FloatToString(efeeseprima)+"\n")
 
             stopCount = 0.0
             for i := 0;i < len(eseprima); i++ {
@@ -632,9 +632,9 @@ type tsp_parameters struct {
     //Definimos las variables para hacer un loob para correr varias veces el algoritmo
     //tomando diferentes semillas para el random
     var intInicio float64
-    intInicio = 3
+    intInicio = 0
     var intFinal float64
-    intFinal = 3
+    intFinal = 10
     for (intInicio <= intFinal){
        //Incializamos la funcion random
         randomSeed := rand.New(rand.NewSource(int64(intInicio)))
